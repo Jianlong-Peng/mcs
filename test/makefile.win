@@ -1,0 +1,17 @@
+CXX = cl.exe
+CFLAGS = /I"..\include" /W3 /O2 /EHsc /MD /D "NDEBUG" /D "WIN32" /nologo /fp:precise /Zc:wchar_t /Zc:forScope
+LDFLAGS=/INCREMENTAL:NO /SUBSYSTEM:CONSOLE
+
+all: test_makeAG.exe test_clique.exe
+
+test_makeAG.obj: test_makeAG.cpp
+	$(CXX) $(CFLAGS) /c test_makeAG.cpp
+
+test_clique.obj: test_clique.cpp
+	$(CXX) $(CFLAGS) /c test_clique.cpp
+
+test_makeAG.exe: test_makeAG.obj ../objs/graph.obj
+	link.exe $(LDFLAGS) test_makeAG.obj ../objs/graph.obj /OUT:test_makeAG.exe
+
+test_clique.exe: test_clique.obj ../objs/graph.obj ../objs/clique.obj
+	link.exe $(LDFLAGS) test_clique.obj ../objs/graph.obj ../objs/clique.obj /OUT:test_clique.exe

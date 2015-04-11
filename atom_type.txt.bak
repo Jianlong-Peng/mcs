@@ -1,0 +1,112 @@
+#sybyl atom type
+#C.3	sp3 carbon
+#C.2	sp2 carbon
+#C.ar	aromatic carbon
+#C.1	sp carbon
+#N.3	sp3 nitrogen
+#N.2	sp2 nitrogen
+#N.1	sp nitrogen
+#O.3	sp3 oxygen
+#O.2	sp2 oxygen
+#S.3	sp3 sulfur
+#N.ar	aromatic nitrogen
+#P.3	sp3 phosphorous
+#H	hydrogen
+#Br	bromine
+#Cl	chlorine
+#F	fluorine
+#I	iodine
+#S.2	sp2 sulfur
+#N.pl3	trigonal planar nitrogen
+#LP	lone pair
+#Na	sodium
+#K	potassium
+#Ca	calcium
+#Li	lithium
+#Al	aluminum
+#Du	dummy
+#Du.C	dummy with the weight of carbon
+#Si	silicon
+#N.am	amide nitrogen
+#S.o	sulfoxide sulfur
+#S.o2	sulfone sulfur
+#N.4	sp3 positively charged nitrogen
+#O.co2	oxygen in carboxylate or phosphate group
+#C.cat	carbocation, used only in a guadinium group
+#H.spc	hydrogen in SPC water model
+#O.spc	oxygen in SPC water model
+#H.t3p	hydrogen in TIP3P water model
+#O.t3p	oxygen in TIP3P water model
+#ANy	any atom
+#HEV	heavy atom
+#HEP	heteroatom (N,O,S,P)
+#HAL	halogen
+#Mg	magnesium
+#Cr.oh	hydrogen chromium
+#Cr.th	chromium
+#Se	selenium
+#Fe	iron
+#Cu	copper
+#Zn	zinc
+#Sn	tin
+#Mo	molybdenum
+#Mn	manganese
+#Co.oh	hydrogen cobalt
+
+
+#the following atom types are from $(OBDATA_DIR)/atomtyp.txt
+#the LAST PATTERN MATCHED is used as the atom type
+[#1]        H	1
+
+[#7]	N	2
+[#7^3]          N3	3
+[#7X4]          N3+	4
+[#7^2]          Npl	5
+[#7^1]          N1	6
+[$(N=*)]        N2	7
+[$([Nr0]C(=[Nr0])[Nr0])]    Ng+	8
+[$([Nr0]=C([Nr0])[Nr0])]    Ng+	9
+[$([ND1]=C[ND1])]     Ng+	10
+[$([ND1]C=[ND1])]     Ng+	11
+[$(N(O)*)]        Nox	12
+[$(NC=[O,S])]       Nam	13
+[$(N(~[OD1])~[OD1])]      Ntr	14
+[n]         Nar	15
+
+[#6]	C	16
+[#6^3]          C3	17
+[#6^2]          C2	18
+[$(C(=O)[OD1])]       Cac	19
+[c]         Car	20
+[#6^1]          C1	21
+[#6+]         C+	22
+[#6-]         C-	23
+
+[#8]	O	24
+[#8^3]          O3	25
+[#8^2]          O2	26
+[$(Oa)]         O2	27
+#The following 2 lines used for correct Sybyl atom typing
+[$([OD2]C=[O,S])]     O3  #ester oxygen	28
+[$(Oa)]         O3      #aromatic ether	29
+[#8-]         O-	30
+#[$([#8D1]~[#6^2]~[#8D1])]     O.co2	28
+[$([#8D1][#6^2]=[#8D1])]	HOC=O	31
+[$([#8D1]=[#6^2][#8D1])]	O=COH	32
+
+[#15]         P	33
+[#15X4+]        P3+	34
+[#15;$([#15D4](~[OD1])(~[OD1])~[OD1])]  Pac	35
+[#15;$([#15D3](~[OD1])~[OD1])]    Pac	36
+
+[#16]         S3	37
+[#16D3+,#16X3+]       S3+	38
+[#16;s,$([SD1]=*)]      S2	39
+[#16D4;$(S(=O)(=O))]      So2	40
+[#16D3;$(S(=O))]      Sox	41
+[#16;$([#16D4](~[OD1])(~[OD1])~[OD1])]  Sac	42
+[#16;$([#16D3](~[OD1])~[OD1])]    Sac	43
+
+[#5]          B2	44
+[#5D4]          B3	45
+

@@ -1,0 +1,459 @@
+/*=============================================================================
+#     FileName: mcs.cpp
+#         Desc: 
+#       Author: jlpeng
+#        Email: jlpeng1201@gmail.com
+#     HomePage: 
+#      Created: 2013-04-09 16:37:41
+#   LastChange: 2013-04-11 10:56:50
+#      History:
+=============================================================================*/
+#include <iostream>
+#include <vector>
+#include <utility>
+#include <queue>
+#include <algorithm>
+#include <iterator>
+#include <cstdlib>
+#include <cassert>
+#include "graph.h"
+#include "clique.h"
+
+using std::vector;
+using std::pair;
+using std::queue;
+using std::cout;
+using std::cerr;
+using std::endl;
+
+// find all connect graphs
+// return: vector(vector(index of nodes))
+static vector<vector<int> > connectGraph(const MCSGraph *g, const vector<int> &nodes)
+{
+    vector<vector<int> > result;
+    int num_nodes = static_cast<int>(nodes.size());
+    vector<bool> visited(num_nodes,false);
+    int j=0;
+    queue<int> toBeVisit;
+    while(1) {
+        int i = j;
+        while(i<num_nodes && visited[i])
+            ++i;
+        if(i == num_nodes)
+            break;
+        j = i+1;
+        toBeVisit.push(i);
+        visited[i] = true;
+        vector<int> graph;
+        while(!toBeVisit.empty()) {
+            int k = toBeVisit.front();
+            graph.push_back(k);
+            for(int m=0; m<num_nodes; ++m) {
+                if(m==k || visited[m])
+                    continue;
+                if((*g)(nodes[k],nodes[m])) {
+                    toBeVisit.push(m);
+                    visited[m] = true;
+                }
+            }
+            toBeVisit.pop();
+        }
+        result.push_back(graph);
+    }
+    return result;
+}
+
+// to get all unvisited neighbors of node; called by 'extend'
+static vector<int> getNborUnvisited(const MCSGraph *g, int node, vector<bool> &visited)
+{
+    vector<int> nbors = g->getNborsOf(node);
+    vector<int> result;
+    for(vector<int>::iterator i=nbors.begin(); i!=nbors.end(); ++i) {
+        if(!visited[*i])
+            result.push_back(*i);
+    }
+    return result;
+}
+// called by 'extendSCCS'
+static void extend(const AssocGraph &ag, const MCSGraph *g1, const MCSGraph *g2, int node1, int node2,
+        vector<bool> &visited1, vector<bool> &visited2,
+        vector<vector<int> > &result, vector<int> &onePath)
+{
+    vector<int> nbor1 = getNborUnvisited(g1,node1,visited1);
+    vector<int> nbor2 = getNborUnvisited(g2,node2,visited2);
+#ifdef DEBUG
+    cout << " unvisited neighbors of " << node1+1 << ": ";
+    for(vector<int>::iterator i=nbor1.begin(); i!=nbor1.end(); ++i)
+        cout << " " << *i+1;
+    cout << endl << " unvisited neighbors of " << node2+1 << ": ";
+    for(vector<int>::iterator i=nbor2.begin(); i!=nbor2.end(); ++i)
+        cout << " " << *i+1;
+    cout << endl;
+#endif
+    if(nbor1.empty() || nbor2.empty()) {
+        if(!onePath.empty()) {
+#ifdef DEBUG
+            cout << "  find one path: ";
+            for(vector<int>::iterator i=onePath.begin(); i!=onePath.end(); ++i)
+                cout << " " << *i+1;
+            cout << endl;
+#endif
+            result.push_back(onePath);
+        }
+        return ;
+    }
+    
+    for(vector<int>::iterator i=nbor1.begin(); i!=nbor1.end(); ++i) {
+        if(visited1[*i])
+            continue;
+        visited1[*i] = true;
+        for(vector<int>::iterator j=nbor2.begin(); j!=nbor2.end(); ++j) {
+            if(visited2[*j])
+                continue;
+            int ag_index = ag.toAGIndex(*i,*j);
+            if(ag_index!=-1 && ag.getNodeValueOf(ag_index) != 0.) {
+                onePath.push_back(ag_index);
+                visited2[*j] = true;
+                extend(ag,g1,g2,*i,*j,visited1,visited2,result,onePath);
+                visited2[*j] = false;
+                onePath.pop_back();
+            }
+        }
+        visited1[*i] = false;
+    }
+}
+
+// for each existing and new path, to create an extended path by combining them
+static vector<vector<int> > extendPath(const AssocGraph &ag,
+        vector<vector<int> > &existPath, vector<vector<int> > &newPath)
+{
+    vector<vector<int> > result;
+    // if existPath is empty
+    if(existPath.empty()) {
+        for(vector<vector<int> >::iterator i=newPath.begin(); i!=newPath.end(); ++i)
+            result.push_back(*i);
+        return result;
+    }
+    // otherwise
+    for(vector<vector<int> >::iterator i=existPath.begin(); i!=existPath.end(); ++i) {
+        pair<vector<int>,vector<int> > exist_pair_index = ag.toGraphIndices(*i);
+        for(vector<vector<int> >::iterator j=newPath.begin(); j!=newPath.end(); ++j) {
+            result.push_back(*i);
+            for(vector<int>::iterator k=j->begin(); k!=j->end(); ++k) {
+                pair<int,int> new_pair_index = ag.toGraphIndex(*k);
+                // AG index has already in 'existPath'
+                if(find(i->begin(),i->end(),*k) != i->end())
+                    continue;
+                vector<int>::iterator first_exist = find(exist_pair_index.first.begin(),exist_pair_index.first.end(),new_pair_index.first);
+                // graph index has already in 'existPath'
+                // replace it if (*k) has larger node value
+                if(first_exist != exist_pair_index.first.end()) {
+                    int first_i = first_exist - exist_pair_index.first.begin();
+                    if(ag.getNodeValueOf(*k) > ag.getNodeValueOf((*i)[first_i]))
+                        (*i)[first_i] = *k;
+                }
+                else {
+                    vector<int>::iterator second_exist = find(exist_pair_index.second.begin(),exist_pair_index.second.end(),new_pair_index.second);
+                    // graph index has already in 'exitPath'
+                    // replace it if (*k) has larger node value
+                    if(second_exist != exist_pair_index.second.end()) {
+                        int second_i = second_exist - exist_pair_index.second.begin();
+                        if(ag.getNodeValueOf(*k) > ag.getNodeValueOf((*i)[second_i]))
+                            (*i)[second_i] = *k;
+                    }
+                    else
+                        result.back().push_back(*k); // append new atom mapping
+                }
+            }
+        }
+    }
+    return result;
+}
+
+// to see if two vectors contain same content;
+static bool sameContent(const vector<int> &v1, const vector<int> &v2)
+{
+    if(v1.size() != v2.size())
+        return false;
+    for(vector<int>::size_type i=0; i<v1.size(); ++i) {
+        if(v1[i] != v2[i])
+            return false;
+    }
+    return true;
+}
+static vector<vector<int> > extendSCCS(const AssocGraph &ag, 
+        const MCSGraph *g1, const MCSGraph *g2,
+        const pair<vector<int>,vector<int> > &sccs)
+{
+    int nodes1 = g1->numNodes();
+    int nodes2 = g2->numNodes();
+    vector<bool> visited1(nodes1,false);
+    vector<bool> visited2(nodes2,false);
+    vector<int> compsub;
+    for(vector<int>::size_type i=0; i<sccs.first.size(); ++i) {
+        compsub.push_back(ag.toAGIndex(sccs.first[i],sccs.second[i]));
+        visited1[sccs.first[i]] = true;
+        visited2[sccs.second[i]] = true;
+    }
+#ifdef DEBUG
+    cout << endl << "compsub: ";
+    for(vector<int>::size_type i=0; i<compsub.size(); ++i)
+        cout << " " << compsub[i]+1;
+    cout << endl << "atom mapping" << endl << " g1:";
+    for(vector<int>::size_type i=0; i<sccs.first.size(); ++i)
+        cout << " " << sccs.first[i]+1;
+    cout << endl << " g2:";
+    for(vector<int>::size_type i=0; i<sccs.second.size(); ++i)
+        cout << " " << sccs.second[i]+1;
+    cout << endl;
+#endif
+    // 1. to extend path
+    vector<vector<int> > extend_pathes;
+    for(vector<int>::size_type i=0; i<compsub.size(); ++i) {
+        pair<int,int> pair_index = ag.toGraphIndex(compsub[i]);
+#ifdef DEBUG
+        cout << "extend from " << compsub[i]+1 << "(" << pair_index.first+1 << "," << pair_index.second+1 << ")" << endl;
+#endif
+        vector<vector<int> > result; // extend from sccs.first[i]
+        vector<int> temp;
+        extend(ag,g1,g2,sccs.first[i],sccs.second[i],visited1,visited2,result,temp);
+#ifdef DEBUG
+        cout << " => get " << result.size() << " pathes!" << endl;
+        cout << "visited1: ";
+        copy(visited1.begin(),visited1.end(),std::ostream_iterator<bool>(cout," "));
+        cout << endl << "visited2: ";
+        copy(visited2.begin(),visited2.end(),std::ostream_iterator<bool>(cout," "));
+        cout << endl;
+#endif
+        if(!result.empty())
+            extend_pathes = extendPath(ag,extend_pathes,result);
+#ifdef DEBUG
+        cout << "after extendPath, now extend_pathes.size()=" << extend_pathes.size() << endl;
+#endif
+    }
+#ifdef DEBUG
+    cout << "==> finished extending all nodes, extend_pathes.size()=" << extend_pathes.size() << endl;
+#endif
+    // 2.  prepare the final SCCS
+    vector<vector<int> > final_result;
+    // 2.1 if no extended pathes found
+    if(extend_pathes.empty()) {
+        final_result.push_back(compsub);
+        return final_result;
+    }
+    // 2.2.1 sort each path of 'extend_pathes'
+#ifdef DEBUG
+    cout << "extend_pathes after sorting" << endl;
+    for(vector<vector<int> >::size_type i=0; i<extend_pathes.size(); ++i) {
+        sort(extend_pathes[i].begin(),extend_pathes[i].end());
+        for(vector<int>::size_type j=0; j<extend_pathes[i].size(); ++j)
+            cout << extend_pathes[i][j]+1 << " ";
+        cout << endl;
+    }
+    cout << "Now, join extend_pathes to compsub" << endl;
+#endif
+    // 2.2.2 join 'compsub' and each extended path
+    vector<bool> duplicate(extend_pathes.size(),false);
+    for(vector<vector<int> >::size_type i=0; i<extend_pathes.size(); ++i) {
+        if(duplicate[i])
+            continue;
+        final_result.push_back(compsub);
+        for(vector<int>::iterator j=extend_pathes[i].begin(); j!=extend_pathes[i].end(); ++j)
+            final_result.back().push_back(*j);
+        if(i == extend_pathes.size()-1)
+            break;
+        for(vector<vector<int> >::size_type k=i+1; k<extend_pathes.size(); ++k) {
+            if(sameContent(extend_pathes[i],extend_pathes[k]))
+                duplicate[k] = true;
+        }
+    }
+    return final_result;
+}
+
+static bool inQuasiMCS(const vector<pair<vector<int>,vector<int> > > &quasiMCS,
+        const vector<int> &g1, const vector<int> &g2)
+{
+    for(vector<pair<vector<int>,vector<int> > >::const_iterator i=quasiMCS.begin();
+            i!=quasiMCS.end(); ++i) {
+        if(i->first.size()==g1.size()) {
+            bool same = true;
+            for(vector<int>::size_type j = 0; j<g1.size(); ++j) {
+                if(g1[j]!=i->first[j] || g2[j]!=i->second[j]) {
+                    same = false;
+                    break;
+                }
+            }
+            if(same)
+                return true;
+        }
+    }
+    return false;
+}
+
+// remove duplicates from 'cliques'. called by 'findMCS'
+static void removeDuplicate(vector<vector<int> > &cliques)
+{
+    // sort
+    for(vector<vector<int> >::iterator i=cliques.begin(); i!=cliques.end(); ++i)
+        sort(i->begin(),i->end());
+    // remove duplicates
+    for(vector<vector<int> >::iterator i=cliques.begin(); i!=cliques.end(); ++i) {
+        vector<vector<int> >::iterator j = i+1;
+        while(j != cliques.end()) {
+            if(i->size() != j->size())
+                ++j;
+            else {
+                bool same = true;
+                for(vector<int>::size_type m=0; m<i->size(); ++m) {
+                    if((*i)[m] != (*j)[m]) {
+                        same = false;
+                        break;
+                    }
+                }
+                if(same)
+                    j = cliques.erase(j);
+                else
+                    ++j;
+            }
+        }
+    }
+    
+}
+vector<pair<vector<int>,vector<int> > > findMCS(const MCSGraph *g1, const MCSGraph *g2,
+        int rmax, int smin,
+        float (*atomMapWeight)(const MCSGraph *g1, int i1, const MCSGraph *g2, int i2))
+{
+    // 1. AG and call clique finding algorithm
+    AssocGraph ag(g1,g2,atomMapWeight);
+    vector<vector<int> > cliques = findCliques(ag.getMatrix(),rmax);
+    //cerr << "totally " << cliques.size() << " cliques" << endl;
+    // 2. index of cliques -> index of g1&g2
+    //    and remove SCCSs whose cardinality is lower than smin
+    //    and retain unique SCCSs
+    vector<pair<vector<int>,vector<int> > > quasiMCS;
+    for(vector<vector<int> >::iterator i=cliques.begin(); i!=cliques.end(); ++i) {
+        // graph indices of clique[i]
+        pair<vector<int>,vector<int> > pair_index = ag.toGraphIndices(*i);
+        // separate clique[i] into SCCSs
+        vector<vector<int> > connect_index = connectGraph(g1,pair_index.first);
+        // only retain those SCCSs with number of nodes >= smin
+        for(vector<vector<int> >::iterator j=connect_index.begin(); j!=connect_index.end(); ++j) {
+            if(static_cast<int>(j->size()) < smin)
+                continue;
+            vector<int> tmp_g1;
+            vector<int> tmp_g2;
+            for(vector<int>::iterator k=j->begin(); k!=j->end(); ++k) {
+                tmp_g1.push_back(pair_index.first[*k]);
+                tmp_g2.push_back(pair_index.second[*k]);
+            }
+            if(!inQuasiMCS(quasiMCS,tmp_g1,tmp_g2))
+                quasiMCS.push_back(make_pair(tmp_g1,tmp_g2));
+        }
+    }
+    //cerr << "after generating quasiMCS, there are " << quasiMCS.size() << " quasiMCSs" << endl;
+    // 3. extend SCCSs
+    cliques.clear();  // vector<vector<int> >
+#ifdef DEBUG
+    int ii = 0;
+#endif
+    for(vector<pair<vector<int>,vector<int> > >::iterator i=quasiMCS.begin(); i!=quasiMCS.end(); ++i) {
+#ifdef DEBUG
+        cout << "extend SCCS " << ++ii;
+#endif
+        vector<vector<int> > temp = extendSCCS(ag,g1,g2,*i);
+        for(vector<vector<int> >::iterator j=temp.begin(); j!=temp.end(); ++j)
+            cliques.push_back(*j);
+#ifdef DEBUG
+        cout << "==> totally " << temp.size() << " SCCSs" << endl << endl;
+#endif
+    }
+    //cerr << "after extending SCCSs, there are " << cliques.size() << " cliques" << endl;
+    // remove duplicates among 'cliques'
+    removeDuplicate(cliques);
+    // convert AG index to graph pair index
+    quasiMCS.clear(); // vector<pair<vector<int>,vector<int> > >
+    for(vector<vector<int> >::iterator i=cliques.begin(); i!=cliques.end(); ++i)
+        quasiMCS.push_back(ag.toGraphIndices(*i));
+    //cerr << "after converting index" << endl;
+    // 4. calculate the weight of each mapping
+    vector<float> sums;
+    for(vector<pair<vector<int>,vector<int> > >::iterator i=quasiMCS.begin(); i!=quasiMCS.end(); ++i) {
+        float sum = 0.;
+        for(vector<int>::size_type j=0; j<(i->first).size(); ++j)
+            sum += atomMapWeight(g1,i->first[j],g2,i->second[j]);
+        sums.push_back(sum);
+    }
+    //cerr << "after calculating weight" << endl;
+    // 5. extract those mapping(s) with maximum weight
+    float max_sum = *std::max_element(sums.begin(),sums.end());
+    vector<pair<vector<int>,vector<int> > > result;
+    for(vector<pair<vector<int>,vector<int> > >::size_type i=0; i<quasiMCS.size(); ++i) {
+        if(sums[i] == max_sum)
+            result.push_back(quasiMCS[i]);
+    }
+    return result;
+}
+
+vector<int> mapWithMinChange(const MCSGraph *g1, const MCSGraph *g2,
+        const vector<pair<vector<int>,vector<int> > > &mcs)
+{
+    // 1. minimize "number of mapping atoms that have non-mapping neighbors"
+    vector<int> num_change(mcs.size());
+    for(vector<pair<vector<int>,vector<int> > >::size_type i=0; i<mcs.size(); ++i) {
+        int sum = 0;
+        // to check neighbors of each mapping atom pair
+        for(vector<int>::size_type j=0; j<mcs[i].first.size(); ++j) {
+            vector<int> nbors_first = g1->getNborsOf(mcs[i].first[j]);
+            bool miss = false;
+            for(vector<int>::iterator k=nbors_first.begin(); k!=nbors_first.end(); ++k) {
+                if(find(mcs[i].first.begin(),mcs[i].first.end(),*k) == mcs[i].first.end()) {
+                    miss = true;
+                    break;
+                }
+            }
+            if(miss)
+                ++sum;
+            else {
+                vector<int> nbors_second = g2->getNborsOf(mcs[i].second[j]);
+                for(vector<int>::iterator k=nbors_second.begin(); k!=nbors_second.end(); ++k) {
+                    if(find(mcs[i].second.begin(),mcs[i].second.end(),*k) == mcs[i].second.end()) {
+                        miss = true;
+                        break;
+                    }
+                }
+                if(miss)
+                    ++sum;
+            }
+        }
+        num_change[i] = sum;
+    }
+    int min_change = *std::min_element(num_change.begin(),num_change.end());
+    vector<int> min_index;
+    for(vector<int>::size_type i=0; i<num_change.size(); ++i) {
+        if(min_change == num_change[i])
+            min_index.push_back(i);
+    }
+    // 2. minimize "number of bond changes within mapping atoms"
+    vector<int> bond_change(min_index.size());
+    for(vector<int>::size_type i=0; i<min_index.size(); ++i) {
+        int sum = 0;
+        for(vector<int>::size_type j=0; j<mcs[min_index[i]].first.size()-1; ++j) {
+            for(vector<int>::size_type k=j+1; k<mcs[min_index[i]].first.size(); ++k) {
+                int btype1 = (*g1)(mcs[min_index[i]].first[j],mcs[min_index[i]].first[k]);
+                int btype2 = (*g2)(mcs[min_index[i]].second[j],mcs[min_index[i]].second[k]);
+                if(btype1 && (btype1 != btype2))
+                    ++sum;
+            }
+        }
+        bond_change[i] = sum;
+    }
+    int min_bond_change = *std::min_element(bond_change.begin(),bond_change.end());
+    vector<int> min_index1;
+    for(vector<int>::size_type i=0; i<bond_change.size(); ++i) {
+        if(min_bond_change == bond_change[i])
+            min_index1.push_back(min_index[i]);
+    }
+    return min_index1;
+}
+
+

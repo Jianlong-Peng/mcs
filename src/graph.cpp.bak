@@ -1,0 +1,248 @@
+/*=============================================================================
+#     FileName: graph.cpp.bak
+#         Desc: 
+#       Author: jlpeng
+#        Email: jlpeng1201@gmail.com
+#     HomePage: 
+#      Created: 2013-04-02 16:12:17
+#   LastChange: 2013-04-09 22:04:59
+#      History:
+=============================================================================*/
+
+#include <iostream>
+#include <utility>
+#include <vector>
+#include <iterator>
+#include <cstdlib>
+#include <cassert>
+#include <cstring>
+#include "graph.h"
+
+using std::cerr;
+using std::endl;
+using std::ostream;
+using std::vector;
+using std::pair;
+
+MCSMatrix::MCSMatrix(int n)
+{
+    assert(n > 0);
+    _nnode = n;
+    int _n = n*(n+1)/2;
+    _m = new int [_n];
+    if(_m == NULL) {
+        cerr << __FILE__ << "(line " << __LINE__ << "): out of memory!" << endl;
+        exit(EXIT_FAILURE);
+    }
+    memset(_m,0,_n*sizeof(int));
+}
+
+MCSMatrix::MCSMatrix(const MCSMatrix &m)
+{
+    _nnode = m.numNodes();
+    int _n = _nnode*(_nnode+1)/2;
+    _m = new int [_n];
+    if(_m == NULL) {
+        cerr << __FILE__ << "(line " << __LINE__ << "): out of memory!" << endl;
+        exit(EXIT_FAILURE);
+    }
+    for(int i=0; i<_n; ++i)
+        for(int j=i; j<_n; ++j)
+            (*this)(i,j) = m(i,j);
+}
+
+MCSMatrix::~MCSMatrix()
+{
+    if(_m)
+        delete[] _m;
+}
+
+MCSMatrix &MCSMatrix::operator=(const MCSMatrix &m)
+{
+    if(this == &m)
+        return *this;
+    if(_nnode==0 && m.numNodes()!=0) {
+	_m = new int [m.numNodes()];
+	if(_m == NULL) {
+	    cerr << __FILE__ << "(line " << __LINE << "): out of memory!" << endl;
+	    exit(EXIT_FAILURE);
+	}
+	_nnode = m.numNodes();
+    }
+    assert(_nnode==m.numNodes());
+    for(int i=0; i<_nnode; ++i)
+        for(int j=i; j<_nnode; ++j)
+	    (*this)(i,j) = m(i,j);
+    return *this;
+}
+
+int MCSMatrix::getIndex(int i, int j) const
+{
+    assert(_nnode!=0 && i>=0 && j>=0 && i<_nnode && j<_nnode);
+    int index;
+    if(i < j)
+        index = (2*_nnode-i+1)*i/2 + j-i;
+    else
+        index = (2*_nnode-j+1)*j/2 + i-j;
+    return index;
+}
+
+const int &MCSMatrix::operator()(int i, int j) const
+{
+    return _m[getIndex(i,j)];
+}
+
+int &MCSMatrix::operator()(int i, int j)
+{
+    return _m[getIndex(i,j)];
+}
+
+void MCSMatrix::display(ostream &fout, const char *sep) const
+{
+    if(_nnode == 0)
+	fout << "empty matrix" << endl;
+    else {
+        for(int i=0; i<_nnode; ++i) {
+	    for(int j=0; j<_nnode; ++j)
+		fout << sep << (*this)(i,j);
+	    fout << endl;
+	}
+    }
+}
+
+bool MCSGraph::connect(int i, int j) const 
+{
+    if(i==j || _m(i,j)==0)
+        return false;
+    else
+        return true;
+}
+
+const int &MCSGraph::getNodeLabelOf(int i) const
+{
+    assert(i>=0 && i<static_cast<int>(_vertex.size()));
+    return _vertex[i];
+}
+
+int &MCSGraph::getNodeLabelOf(int i)
+{
+    assert(i>=0 && i<static_cast<int>(_vertex.size()));
+    return _vertex[i];
+}
+
+void MCSGraph::display(ostream &fout, const char *sep) const
+{
+    fout << "vertex labels:";
+    for(vector<int>::const_iterator i=_vertex.begin(); i!=_vertex.end(); ++i)
+        fout << sep << *i;
+    fout << endl;
+    _m.display(fout,sep);
+}
+
+static float nodeValue(const MCSGraph *g1, int i1, const MCSGraph *g2, int i2)
+{
+    if(g1->getNodeLabelOf(i1) == g2->getNodeLabelOf(i2))
+        return 1.;
+    else
+        return 0.;
+}
+AssocGraph::AssocGraph(const MCSGraph *g1, const MCSGraph *g2,
+            float (*nodeOfAG)(const MCSGraph *g1, int i1, const MCSGraph *g2, int i2))
+    :_nodes_g1(g1->numNodes()),_nodes_g2(g2->numNodes()),
+     _node(_nodes_g1*_nodes_g2),_m(_nodes_g1*_nodes_g2)
+{
+    int nodes_ag = _nodes_g1 * _nodes_g2;
+    // vertexes of ag: v11v21, v11v22, v11v23,..., v12v21, v21v22, ..., v1nv21, ..., v1nv2m
+    int index_1i, index_2i, index_1j, index_2j;
+    bool connect_1i_1j, connect_2i_2j;
+    // fill node value
+    for(int i=0; i<nodes_ag; ++i) {
+        index_1i = i / _nodes_g2;
+        index_2i = i % _nodes_g2;
+        if(nodeOfAG)
+            _node[i] = nodeOfAG(g1,index_1i,g2,index_2i);
+        else
+            _node[i] = nodeValue(g1,index_1i,g2,index_2i);
+    }
+    // fill edges of AG
+    for(int i=0; i<nodes_ag-1; ++i) {
+        if(_node[i] == 0.) // node 1i and 2i can't be matched
+            continue;
+        index_1i = i / _nodes_g2;
+        index_2i = i % _nodes_g2;
+        for(int j=i+1; j<nodes_ag; ++j) {
+            if(_node[j] == 0.) // node1j and 2j can't be matched
+                continue;
+            index_1j = j / _nodes_g2;
+            index_2j = j % _nodes_g2;
+            if(index_1i==index_1j || index_2i==index_2j) // how to deal with this situation??????!!!!!!
+                continue;
+            connect_1i_1j = g1->connect(index_1i,index_1j);
+            connect_2i_2j = g2->connect(index_2i,index_2j);
+            if(connect_1i_1j == connect_2i_2j)
+                _m(i,j) = 1;
+        }
+    }
+}
+
+void AssocGraph::toGraphIndex(int agindex, int *i, int *j) const
+{
+    assert(agindex>=0 && agindex<_nodes_g1*_nodes_g2);
+    *i = agindex / _nodes_g2;
+    *j = agindex % _nodes_g2;
+}
+
+pair<vector<int>,vector<int> > AssocGraph::toGraphIndex(const vector<int> &agindex) const
+{
+    vector<int> index_g1, index_g2;
+    for(vector<int>::const_iterator k=agindex.begin(); k!=agindex.end(); ++k) {
+        int i,j;
+        toGraphIndex(*k,&i,&j);
+        index_g1.push_back(i);
+        index_g2.push_back(j);
+    }
+    return make_pair(index_g1,index_g2);
+}
+
+/*
+MCSMatrix *makeAG(const MCSGraph &g1, const MCSGraph &g2,
+        bool (*connect)(const MCSGraph &g, int i, int j))
+{
+    int nodes_g1 = g1.numNodes();
+    int nodes_g2 = g2.numNodes();
+    int nodes_ag = nodes_g1 * nodes_g2;
+    MCSMatrix *ag = new MCSMatrix(nodes_ag);
+    // vertexes of ag: v11v21, v11v22, v11v23,..., v12v21, v21v22, ..., v1nv21, ..., v1nv2m
+    int index_1i, index_2i, index_1j, index_2j;
+    bool connect_1i_1j, connect_2i_2j;
+    for(int i=0; i<nodes_ag-1; ++i) {
+        index_1i = i/nodes_g2;
+        index_2i = i%nodes_g2;
+        for(int j=i+1; j<nodes_ag; ++j) {
+            index_1j = j/nodes_g2;
+            index_2j = j%nodes_g2;
+            if(index_1i==index_1j || index_2i==index_2j) // how to deal with this situation??????!!!!!!
+                continue;
+            if(connect) {
+                connect_1i_1j = connect(g1,index_1i,index_1j);
+                connect_2i_2j = connect(g2,index_2i,index_2j);
+            }
+            else {
+                connect_1i_1j = g1.connect(index_1i,index_1j);
+                connect_2i_2j = g2.connect(index_2i,index_2j);
+            }
+            if(connect_1i_1j == connect_2i_2j)
+                (*ag)(i,j) = 1;
+        }
+    }
+    return ag;
+}
+
+void AGIndex2GraphIndex(int nnodes2, int agindex, int *i, int *j)
+{
+    assert(agindex>=0 && agindex<nnodes1*nnodes2);
+    *i = agindex / nnodes2;
+    *j = agindex % nnodes2;
+}
+*/
+

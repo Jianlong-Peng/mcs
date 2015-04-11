@@ -1,0 +1,89 @@
+#KEGG atom types
+#Ref: Hattori M. et al. J. AM. CHEM. SOC. 2003, 25(39):11853-11865
+#the LAST PATTERN matched will be assigned to atom
+#carbon (23)
+[#6]                    undefined carbon
+[CH3X4]                 C1a
+[CH2X4]                 C1b non-ring
+[CHX4]                  C1c non-ring
+[CH0X4]                 C1d non-ring
+[CH2X4;R]               C1x
+[CH1X4;R]               C1y
+[CH0X4;R]               C1z
+[CH2X3]=*               C2a
+[CH1X3]=*               C2b non-ring
+[CH0X3]=*               C2c non-ring
+[CH1X3;R]=[*;R]         C2x
+[CH0X3;R]=*             C2y
+[CH1X2]#*               C3a
+[CH0X2]#*               C3b
+[CH1X3]=O               C4a
+[CH0X3]=O               C5a non-ring
+[CH0X3;R]=[O;!R]        C5x
+[CH0X3]([OH1X2])=O      C6a carboxylic acid
+[CH0X3]([OH0X2])=O      C7a ester
+[CH0X3;R]([OH0X2;R])=O  C7x lactone
+[cH1X3;R]               C8x phenol
+[cH0X3;R]               C8y
+
+#oxygen (18)
+[#8]                    undefined oxygen
+[OHX2][!#7;!#15;!#16]   O1a alcohol
+[OHX2][#7]              O1b
+[OHX2][#15]             O1c
+[OHX2][#16]             O1d
+[OH0X2]([!#15])[!#15]   O2a ether
+[OH0X2][#15]            O2b
+[OH0X2]([#15])[#15]     O2c
+[O;R]                   O2x
+O=[#7]                  O3a
+O=[#15]                 O3b
+O=[#16]                 O3c
+O=[CH1X3]               O4a aldehydes
+O=[CH0X3]               O5a ketone
+O=[C;R]                 O5x cyclic ketone
+[$(O=[CH0X3][OH1X2]),$([OH1X2][CH0X3]=O)]       O6a carboxylic acid
+[$(O=[CH0X3][OH0X2]),$([OH0X2][CH0X3]=O)]       O7a ester   ????
+[$(O=[CH0X3;R][O;R]),$([O;R][CH0X3;R]=O)]       O7x lactone ????
+
+#nitrogen (16)
+[#7]                            undefined nitrogen
+[$([NH2X3]),$([NH3X4])]         N1a
+[$([NH1X3]),$([NH2X4])]         N1b non-ring
+[$([NH0X3]),$([NH1X4])]         N1c non-ring
+[NH0X4]                         N1d non-ring
+[NH1X3;R]                       N1x
+[NH0X3;R]                       N1y
+[$([NHX2]=*),$([NH2X3]=*)]      N2a
+[NH0X2]=*                       N2b non-ring
+[NH0X2;R]=[*;R]                 N2x
+[NH0X3;R]=[*;R]                 N2y
+[NH0X1]#*                       N3a
+[NH1X3;R]                       N4x
+[NH0X3;R]                       N4y
+[NH0X2;R]=[*;R]                 N5x
+[NH0X3;R]=[*;R]                 N5y
+
+#sulfur (7)
+[#16]                           undefined sulfur
+[SH1X2]                         S1a
+[SH0X2]                         S2a non-ring
+[SH0X2;R]                       S2x
+[SH0X2][SH0X2]                  S3a non-ring
+[SH0X2;R][SH0X2;R]              S3x
+[SH0X4](=O)(=O)O                S4a
+
+#phosphorus (2)
+P[!#1;!#8]                      P1a
+PO                              P1b
+
+[#9]
+
+[#17]
+
+[#35]
+
+[#53]
+
+*       others
+

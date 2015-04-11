@@ -1,0 +1,31 @@
+CXX = cl.exe
+CFLAGS = /I"include" /W3 /O2 /EHsc /MD /D "NDEBUG" /D "WIN32" /nologo /fp:precise /Zc:wchar_t /Zc:forScope
+LDFLAGS=/INCREMENTAL:NO /SUBSYSTEM:CONSOLE /LIBPATH:D:\openbabel-2.3.0\bin openbabel-2.lib
+OBJ_TARGET = objs
+OBJS = $(OBJ_TARGET)\graph.obj $(OBJ_TARGET)\clique.obj $(OBJ_TARGET)\mcs.obj $(OBJ_TARGET)\tools.obj
+
+all: $(OBJS) mcs.exe mcs.bak.exe
+
+$(OBJ_TARGET)\graph.obj: src\graph.cpp
+	$(CXX) $(CFLAGS) /c src\graph.cpp /Fo"$(OBJ_TARGET)\graph.obj"
+
+$(OBJ_TARGET)\clique.obj: src\clique.cpp
+	$(CXX) $(CFLAGS) /c src\clique.cpp /Fo"$(OBJ_TARGET)\clique.obj"
+
+$(OBJ_TARGET)\mcs.obj: src\mcs.cpp
+	$(CXX) $(CFLAGS) /c src\mcs.cpp /Fo"$(OBJ_TARGET)\mcs.obj"
+
+$(OBJ_TARGET)\tools.obj: src\tools.cpp
+	$(CXX) $(CFLAGS) /I"D:\openbabel-2.3.0\include\openbabel-2.0" /c src\tools.cpp /Fo"$(OBJ_TARGET)\tools.obj"
+
+main.obj: main.cpp
+	$(CXX) /I"D:\openbabel-2.3.0\include\openbabel-2.0" $(CFLAGS) /c main.cpp
+
+main.bak.obj: main.bak.cpp
+	$(CXX) /I"D:\openbabel-2.3.0\include\openbabel-2.0" $(CFLAGS) /c main.bak.cpp /Fo"main.bak.obj"
+
+mcs.exe: main.obj $(OBJS)
+	link.exe $(LDFLAGS) main.obj $(OBJS) /OUT:mcs.exe
+
+mcs.bak.exe: main.bak.obj $(OBJS)
+	link.exe $(LDFLAGS) main.bak.obj $(OBJS) /OUT:mcs.bak.exe
